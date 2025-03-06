@@ -4,7 +4,7 @@ import csv                              #used to read and write csv files
 from datetime import datetime          #provides functionality to work with date and time for validating and formatting reservation dates and times
 import os     #used to interact with OS of the computer. to check if file exists or not in the computer.
 
-# File names
+# File names                   #jackfruit problem.
 RESTAURANTS_FILE = "J_restaurants.csv"  #tkinter for gui and csv for storing files used
 USERS_FILE = "J_users.csv"
 BOOKINGS_FILE = "J_bookings.csv"
