@@ -1,0 +1,177 @@
+import tkinter as tk          #provides gui components
+from tkinter import messagebox       #used to display popup messages info and error
+import csv                              #used to read and write csv files
+from datetime import datetime          #provides functionality to work with date and time for validating and formatting reservation dates and times
+import os     #used to interact with OS of the computer. to check if file exists or not in the computer.
+
+# File names
+RESTAURANTS_FILE = "J_restaurants.csv"  #tkinter for gui and csv for storing files used
+USERS_FILE = "J_users.csv"
+BOOKINGS_FILE = "J_bookings.csv"
+
+# Ensures that particular CSV files exists, if not, creates and writes provided header row to it.
+def ensure_csv_file(file_name, header):                       #file_name gives name of csv files can move through the 3 files too,list of column headers
+    if not os.path.exists(file_name):                     
+        with open(file_name, mode="w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(header)
+
+# Load data from CSV file and returns it as a list of rows with each row being list of values.
+def load_data(file_name):       
+    if not os.path.exists(file_name):
+        return []                #returns a list of rows from csv if it exists, else, returns an empty list.
+    with open(file_name, mode="r", newline="") as file:
+        reader = csv.reader(file)
+        return list(reader)   
+
+# Saves data to CSV 
+def save_data(file_name, data):    #data is a list of rows, each row is a list of column values to be written to the file.
+    with open(file_name, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerows(data)
+
+# GUI Setup
+class RestaurantBookingSystem:     #this class defines the structure and behaviour of restaurant booking system's gui.
+    def __init__(self, root):  #init is the constructor used. # Fixed method name
+        self.root = root
+        self.root.title("Restaurant Booking System")  #sets window title name.
+
+        # Ensure csv files exist
+        ensure_csv_file(RESTAURANTS_FILE, ["restaurant_id","name","cuisine_type","rating","location","total_tables","table_configuration","opening_hours","closing_hours"]) 
+        ensure_csv_file(USERS_FILE, ["user_id", "name", "email","phone_number","current_bookings"])
+        ensure_csv_file(BOOKINGS_FILE, ["booking_id", "restaurant_id", "date", "time", "party_size"])
+
+        # Loads Data 
+        self.restaurants = load_data(RESTAURANTS_FILE)[1:]  # Skip header
+        self.bookings = load_data(BOOKINGS_FILE)[1:]  # Skip header    #loads data from csv file and skips header
+        self.users = load_data(USERS_FILE)[1:]  # Skip header
+
+        # Main UI Components
+        self.create_main_menu()     #setups main menu
+
+    def create_main_menu(self):  #welcome label, view rest,manage bookings 2 buttons
+        self.clear_frame()
+        tk.Label(self.root, text="Welcome to the Restaurant Booking System", font=("Arial", 16)).pack(pady=10)
+        tk.Button(self.root, text="View Restaurants", command=self.view_restaurants).pack(pady=5)
+        tk.Button(self.root, text="Manage Bookings", command=self.manage_bookings).pack(pady=5)
+
+    def view_restaurants(self):
+        self.clear_frame()
+        tk.Label(self.root, text="Restaurants", font=("Arial", 14)).pack(pady=10)
+
+        # Search and filter options
+        search_var = tk.StringVar()
+        tk.Entry(self.root, textvariable=search_var, width=30).pack(pady=5)
+        tk.Button(self.root, text="Search", command=lambda: self.display_restaurants(search_var.get())).pack(pady=5)
+
+        # Display restaurants
+        self.restaurant_list = tk.Listbox(self.root, width=50, height=15)
+        self.restaurant_list.pack(pady=10)
+        self.display_restaurants("")
+
+        tk.Button(self.root, text="Back", command=self.create_main_menu).pack(pady=5)
+
+    def display_restaurants(self, search_query):
+        self.restaurant_list.delete(0, tk.END)
+        if not self.restaurants:
+            self.restaurant_list.insert(tk.END, "No restaurants available.")
+            return
+        for restaurant in self.restaurants:
+            if search_query.lower() in restaurant[1].lower():  # Match search query with restaurant name
+                self.restaurant_list.insert(tk.END, f"{restaurant[1]} ({restaurant[2]}) - {restaurant[3]} stars")
+
+    def manage_bookings(self):
+        self.clear_frame()
+        tk.Label(self.root, text="Manage Bookings", font=("Arial", 14)).pack(pady=10)
+        tk.Button(self.root, text="Make a Reservation", command=self.make_reservation).pack(pady=5)
+        tk.Button(self.root, text="Cancel a Reservation", command=self.cancel_reservation).pack(pady=5)
+        tk.Button(self.root, text="Back", command=self.create_main_menu).pack(pady=5)
+
+    def make_reservation(self):
+        self.clear_frame()
+        tk.Label(self.root, text="Make a Reservation", font=("Arial", 14)).pack(pady=10)
+
+        # Inputs for reservation
+        tk.Label(self.root, text="Restaurant ID:").pack()
+        restaurant_id = tk.Entry(self.root)
+        restaurant_id.pack()
+
+        tk.Label(self.root, text="Date (YYYY-MM-DD):").pack()
+        date = tk.Entry(self.root)
+        date.pack()
+
+        tk.Label(self.root, text="Time (HH:MM):").pack()
+        time = tk.Entry(self.root)
+        time.pack()
+
+        tk.Label(self.root, text="Party Size:").pack()
+        party_size = tk.Entry(self.root)
+        party_size.pack()
+
+        tk.Button(self.root, text="Confirm", command=lambda: self.confirm_reservation(
+            restaurant_id.get(), date.get(), time.get(), party_size.get()
+        )).pack(pady=10)
+
+        tk.Button(self.root, text="Back", command=self.manage_bookings).pack(pady=5)
+
+    def confirm_reservation(self, restaurant_id, date, time, party_size):
+        try:
+            # Ensure restaurant exists
+            if not any(restaurant[0] == restaurant_id for restaurant in self.restaurants):
+                raise ValueError("Invalid restaurant ID!")
+
+            # Validate date and time
+            date_obj = datetime.strptime(date, "%Y-%m-%d")
+            time_obj = datetime.strptime(time, "%H:%M")
+            if date_obj < datetime.now():
+                raise ValueError("Reservation date must be in the future!")
+
+            # Validate party size
+            if not party_size.isdigit() or int(party_size) <= 0:
+                raise ValueError("Party size must be a positive number!")
+
+            # Generate booking ID
+            booking_id = str(len(self.bookings) + 1)
+
+            # Add booking record
+            new_booking = [booking_id, restaurant_id, date, time, party_size]
+            self.bookings.append(new_booking)
+            save_data(BOOKINGS_FILE, [["booking_id", "restaurant_id", "date", "time", "party_size"]] + self.bookings)
+
+            messagebox.showinfo("Success", "Reservation confirmed!")
+            self.manage_bookings()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def cancel_reservation(self):
+        self.clear_frame()
+        tk.Label(self.root, text="Cancel a Reservation", font=("Arial", 14)).pack(pady=10)
+
+        tk.Label(self.root, text="Booking ID:").pack()
+        booking_id = tk.Entry(self.root)
+        booking_id.pack()
+
+        tk.Button(self.root, text="Cancel", command=lambda: self.confirm_cancel(booking_id.get())).pack(pady=10)
+        tk.Button(self.root, text="Back", command=self.manage_bookings).pack(pady=5)
+
+    def confirm_cancel(self, booking_id):
+        try:
+            # Find booking by ID
+            self.bookings = [booking for booking in self.bookings if booking[0] != booking_id]
+            save_data(BOOKINGS_FILE, [["booking_id", "restaurant_id", "date", "time", "party_size"]] + self.bookings)
+
+            messagebox.showinfo("Success", "Reservation canceled!")
+            self.manage_bookings()
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def clear_frame(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+# Run the GUI
+if __name__ == "__main__":  # Fixed typo here
+    root = tk.Tk()
+    app = RestaurantBookingSystem(root)
+    root.mainloop()
+
